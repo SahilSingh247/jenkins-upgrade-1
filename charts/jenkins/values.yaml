@@ -38,11 +38,11 @@ controller:
     # -- Controller image repository
     repository: "jenkins/jenkins"
 
-    # -- Controller image tag override; i.e., tag: "2.440.1-jdk21"
+    # -- Controller image tag override; i.e., tag: "2.440.1-jdk17"
     tag:
 
     # -- Controller image tag label
-    tagLabel: jdk21
+    tagLabel: jdk17
     # -- Controller image pull policy
     pullPolicy: "Always"
   # -- Controller image pull secret
@@ -78,7 +78,7 @@ controller:
     username: "admin"
     # -- Admin password created as a secret if `controller.admin.createSecret` is true
     # @default -- <random password>
-    password:
+    password: "password"
 
     # -- The key in the existing admin secret containing the username
     userKey: jenkins-admin-user
@@ -226,7 +226,7 @@ controller:
   # -- k8s target port
   targetPort: 8080
   # -- k8s node port. Only used if serviceType is NodePort
-  nodePort:
+  nodePort: 30800
 
   # Use Local to preserve the client source IP and avoids a second hop for LoadBalancer and NodePort type services,
   # but risks potentially imbalanced traffic spreading.
@@ -327,7 +327,7 @@ controller:
   # -- Create Agent listener service
   agentListenerEnabled: true
   # -- Listening port for agents
-  agentListenerPort: 50000
+  agentListenerPort: 50500
   # -- Host port to listen for agents
   agentListenerHostPort:
   # -- Node port to listen for agents
@@ -568,7 +568,7 @@ controller:
         # -- Repository of the image that triggers the reload
         repository: kiwigrid/k8s-sidecar
         # -- Tag for the image that triggers the reload
-        tag: 1.30.3
+        tag: 1.30.2
       imagePullPolicy: IfNotPresent
       resources: {}
         #   limits:
@@ -687,49 +687,49 @@ controller:
   topologySpreadConstraints: {}
 
   ingress:
-    # -- Enables ingress
-    enabled: false
+    enabled: true
+    namespace: alb-nginx-ingress-controller
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internal
+      alb.ingress.kubernetes.io/subnets: "subnet-0f0e7079d150571af,subnet-06bb67e02c9b04de0"
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80,"HTTPS": 443}]'
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:091860164623:certificate/ca945958-2727-4bbe-aee0-d309849353f5
+      alb.ingress.kubernetes.io/healthcheck-path: "/login"
+      alb.ingress.kubernetes.io/healthcheck-interval-seconds: "5"
+      alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "2"
+      alb.ingress.kubernetes.io/unhealthy-threshold-count: "5"
+      alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+      alb.ingress.kubernetes.io/success-codes: "200"
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-FS-1-2-2019-08
+      alb.ingress.kubernetes.io/load-balancer-attributes: "idle_timeout.timeout_seconds=600, routing.http.drop_invalid_header_fields.enabled=true"
+      alb.ingress.kubernetes.io/load-balancer-name: jenkins-upgrade-stage-alb
+      alb.ingress.kubernetes.io/manage-backend-security-group-rules: "true"
+      alb.ingress.kubernetes.io/security-groups: "sg-0fa4df75d5b3277d2"
+      alb.ingress.kubernetes.io/group.name: 'jenkins-upgrade-ingress'
+      alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
 
-    # Override for the default paths that map requests to the backend
-    # -- Override for the default Ingress paths
-    paths: []
-    # - backend:
-    #     serviceName: ssl-redirect
-    #     servicePort: use-annotation
-    # - backend:
-    #     serviceName: >-
-    #       {{ template "jenkins.fullname" . }}
-    #     # Don't use string here, use only integer value!
-    #     servicePort: 8080
+    rules:
+      - host: jenkins-upgrade.api-tenet.com
+        http:
+          paths:
+            - path: "/"
+              pathType: Prefix
+              backend:
+                service:
+                  name: jenkins-ingress
+                  port:
+                    number: 8080
+            - path: "/"
+              pathType: Prefix
+              backend:
+                service:
+                  name: ssl-redirect
+                  port:
+                    name: "use-annotation"
 
-    # For Kubernetes v1.14+, use 'networking.k8s.io/v1beta1'
-    # For Kubernetes v1.19+, use 'networking.k8s.io/v1'
-    # -- Ingress API version
-    apiVersion: "extensions/v1beta1"
-    # -- Ingress labels
-    labels: {}
-    # -- Ingress annotations
-    annotations: {}
-      # kubernetes.io/ingress.class: nginx
-      # kubernetes.io/tls-acme: "true"
-    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
-    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
-    # ingressClassName: nginx
 
-    # Set this path to jenkinsUriPrefix above or use annotations to rewrite path
-    # -- Ingress path
-    path:
-
-    # configures the hostname e.g. jenkins.example.com
-    # -- Ingress hostname
-    hostName:
-    # -- Hostname to serve assets from
-    resourceRootUrl:
-    # -- Ingress TLS configuration
-    tls: []
-    # - secretName: jenkins.cluster.local
-    #   hosts:
-    #     - jenkins.cluster.local
 
   # often you want to have your controller all locked down and private,
   # but you still want to get webhooks from your SCM
@@ -955,7 +955,7 @@ agent:
     # -- Repository to pull the agent jnlp image from
     repository: "jenkins/inbound-agent"
     # -- Tag of the image to pull
-    tag: "3301.v4363ddcca_4e7-3"
+    tag: "3299.v0d0d06908537-1"
   # -- Configure working directory for default agent
   workingDir: "/home/jenkins/agent"
   nodeUsageMode: "NORMAL"
@@ -986,16 +986,16 @@ agent:
       memory: "512Mi"
       # ephemeralStorage:
   livenessProbe: {}
-  #  execArgs: "cat /tmp/healthy"
-  #  failureThreshold: 3
-  #  initialDelaySeconds: 0
-  #  periodSeconds: 10
-  #  successThreshold: 1
-  #  timeoutSeconds: 1
+#    execArgs: "cat /tmp/healthy"
+#    failureThreshold: 3
+#    initialDelaySeconds: 0
+#    periodSeconds: 10
+#    successThreshold: 1
+#    timeoutSeconds: 1
 
   # You may want to change this to true while testing a new image
   # -- Always pull agent container image before build
-  alwaysPullImage: false
+  alwaysPullImage: true
   # When using Pod Security Admission in the Agents namespace with the restricted Pod Security Standard,
   # the jnlp container cannot be scheduled without overriding its container definition with a securityContext.
   # This option allows to automatically inject in the jnlp container a securityContext
@@ -1246,7 +1246,7 @@ persistence:
   # Requires persistence.enabled: true
   # If defined, PVC must be created manually before volume will be bound
   # -- Provide the name of a PVC
-  existingClaim:
+  existingClaim: efs-pvc-2
 
   # jenkins data Persistent Volume Storage Class
   # If defined, storageClassName: <storageClass>
@@ -1254,15 +1254,15 @@ persistence:
   # If undefined (the default) or set to null, no storageClassName spec is
   #   set, choosing the default provisioner (gp2 on AWS, standard on GKE, AWS & OpenStack)
   # -- Storage class for the PVC
-  storageClass:
+  storageClass: efs-sc-2
   # -- Annotations for the PVC
   annotations: {}
   # -- Labels for the PVC
   labels: {}
   # -- The PVC access mode
-  accessMode: "ReadWriteOnce"
+  accessMode: "ReadWriteMany"
   # -- The size of the PVC
-  size: "8Gi"
+  size: "20Gi"
 
   # ref: https://kubernetes.io/docs/concepts/storage/volume-pvc-datasource/
   # -- Existing data source to clone PVC from
@@ -1318,11 +1318,11 @@ rbac:
 
 serviceAccount:
   # -- Configures if a ServiceAccount with this name should be created
-  create: true
+  create: false
 
   # The name of the ServiceAccount is autogenerated by default
   #  -- The name of the ServiceAccount to be used by access-controlled resources
-  name:
+  name: "jenkins-admin-new"
   # -- Configures annotations for the ServiceAccount
   annotations: {}
   # -- Configures extra labels for the ServiceAccount
