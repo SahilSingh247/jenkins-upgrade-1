@@ -686,8 +686,8 @@ controller:
   # -- Topology spread constraints
   topologySpreadConstraints: {}
 
-  # ingress:
-  #   enabled: true
+  ingress:
+    enabled: true
   #   namespace: alb-nginx-ingress-controller
   #   ingressClassName: alb
   #   annotations:
